@@ -28,9 +28,9 @@ namespace ServiceStack
             if (fromType == typeof(T))
                 return (T)from;
 
-            if (fromType.IsValueType() || typeof(T).IsValueType())
+            if (fromType.IsValueType || typeof(T).IsValueType)
             {
-                if (!fromType.IsEnum() && !typeof(T).IsEnum())
+                if (!fromType.IsEnum && !typeof(T).IsEnum)
                 {
                     if (typeof(T) == typeof(char) && from is string s)
                         return (T)(s.Length > 0 ? (object) s[0] : null);
@@ -58,7 +58,7 @@ namespace ServiceStack
                 return (T)ChangeValueType(from, typeof(T));
             }
 
-            if (typeof(IEnumerable).IsAssignableFromType(typeof(T)))
+            if (typeof(IEnumerable).IsAssignableFrom(typeof(T)))
             {
                 var listResult = TranslateListWithElements.TryTranslateCollections(
                     fromType, typeof(T), from);
@@ -72,10 +72,10 @@ namespace ServiceStack
 
         public static T CreateCopy<T>(this T from)
         {
-            if (typeof(T).IsValueType())
+            if (typeof(T).IsValueType)
                 return (T)ChangeValueType(from, typeof(T));
 
-            if (typeof(IEnumerable).IsAssignableFromType(typeof(T)))
+            if (typeof(IEnumerable).IsAssignableFrom(typeof(T)))
             {
                 var listResult = TranslateListWithElements.TryTranslateCollections(
                     from.GetType(), typeof(T), from);
@@ -101,10 +101,10 @@ namespace ServiceStack
             if (from.GetType() == type)
                 return from;
 
-            if (from.GetType().IsValueType() || type.IsValueType())
+            if (from.GetType().IsValueType || type.IsValueType)
                 return ChangeValueType(from, type);
 
-            if (typeof(IEnumerable).IsAssignableFromType(type))
+            if (typeof(IEnumerable).IsAssignableFrom(type))
             {
                 var listResult = TranslateListWithElements.TryTranslateCollections(
                     from.GetType(), type, from);
@@ -118,8 +118,7 @@ namespace ServiceStack
 
         private static object ChangeValueType(object from, Type type)
         {
-            var strValue = from as string;
-            if (strValue != null)
+            if (from is string strValue)
                 return TypeSerializer.DeserializeFromString(strValue, type);
 
             if (type == typeof(string))
@@ -130,11 +129,7 @@ namespace ServiceStack
 
         public static object ChangeTo(this string strValue, Type type)
         {
-            if (type.IsValueType() && !type.IsEnum()
-#if !(PCL || NETSTANDARD1_1)
-                && type.HasInterface(typeof(IConvertible))
-#endif
-                )
+            if (type.IsValueType && !type.IsEnum && type.HasInterface(typeof(IConvertible)))
             {
                 try
                 {
@@ -182,14 +177,14 @@ namespace ServiceStack
         public static object PopulateWith(object obj)
         {
             if (obj == null) return null;
-            var isHttpResult = obj.GetType().Interfaces().Any(x => x.Name == "IHttpResult"); // No coupling FTW!
+            var isHttpResult = obj.GetType().GetInterfaces().Any(x => x.Name == "IHttpResult"); // No coupling FTW!
             if (isHttpResult)
             {
                 obj = new CustomHttpResult();
             }
 
             var type = obj.GetType();
-            if (type.IsArray() || type.IsValueType() || type.IsGeneric())
+            if (type.IsArray || type.IsValueType || type.IsGenericType)
             {
                 var value = CreateDefaultValue(type, new Dictionary<Type, int>(20));
                 return value;
@@ -229,10 +224,10 @@ namespace ServiceStack
 
         public static object GetDefaultValue(this Type type)
         {
-            if (!type.IsValueType()) return null;
+            if (!type.IsValueType) return null;
 
-            object defaultValue;
-            if (DefaultValueTypes.TryGetValue(type, out defaultValue)) return defaultValue;
+            if (DefaultValueTypes.TryGetValue(type, out var defaultValue))
+                return defaultValue;
 
             defaultValue = Activator.CreateInstance(type);
 
@@ -240,8 +235,7 @@ namespace ServiceStack
             do
             {
                 snapshot = DefaultValueTypes;
-                newCache = new Dictionary<Type, object>(DefaultValueTypes);
-                newCache[type] = defaultValue;
+                newCache = new Dictionary<Type, object>(DefaultValueTypes) { [type] = defaultValue };
 
             } while (!ReferenceEquals(
                 Interlocked.CompareExchange(ref DefaultValueTypes, newCache, snapshot), snapshot));
@@ -309,7 +303,7 @@ namespace ServiceStack
                     }
                     else
                     {
-                        if (propertyInfo.CanWrite && propertyInfo.SetMethod() != null)
+                        if (propertyInfo.CanWrite && propertyInfo.GetSetMethod(nonPublic:true) != null)
                         {
                             map[info.Name] = new AssignmentMember(propertyInfo.PropertyType, propertyInfo);
                             continue;
@@ -424,7 +418,7 @@ namespace ServiceStack
                 return;
             }
 
-            var propertySetMetodInfo = propertyInfo.SetMethod();
+            var propertySetMetodInfo = propertyInfo.GetSetMethod(nonPublic:true);
             if (propertySetMetodInfo != null)
             {
                 propertySetMetodInfo.Invoke(obj, new[] { value });
@@ -436,7 +430,7 @@ namespace ServiceStack
             if (propertyInfo == null || !propertyInfo.CanRead)
                 return null;
 
-            var getMethod = propertyInfo.GetMethodInfo();
+            var getMethod = propertyInfo.GetGetMethod(nonPublic:true);
             return getMethod != null ? getMethod.Invoke(obj, TypeConstants.EmptyObjectArray) : null;
         }
 
@@ -467,7 +461,7 @@ namespace ServiceStack
             // Currently we define those properties as properties declared on
             // types defined in mscorlib
 
-            if (propertyInfo != null && propertyInfo.ReflectedType() != null)
+            if (propertyInfo != null && propertyInfo.ReflectedType != null)
             {
                 return PclExport.Instance.InSameAssembly(propertyInfo.DeclaringType, typeof(object));
             }
@@ -494,21 +488,16 @@ namespace ServiceStack
                 return type.Name;
             }
 
-            if (type.IsEnum())
+            if (type.IsEnum)
             {
-#if SL5 || WP
-                return Enum.ToObject(type, 0);
-#else
                 return Enum.GetValues(type).GetValue(0);
-#endif
             }
 
-            if (type.IsAbstract())
+            if (type.IsAbstract)
                 return null;
 
             // If we have hit our recursion limit for this type, then return null
-            int recurseLevel; // will get set to 0 if TryGetValue() fails
-            recursionInfo.TryGetValue(type, out recurseLevel);
+            recursionInfo.TryGetValue(type, out var recurseLevel);
             if (recurseLevel > MaxRecursionLevelForDefaultValues) return null;
 
             recursionInfo[type] = recurseLevel + 1; // increase recursion level for this type
@@ -516,14 +505,14 @@ namespace ServiceStack
             {
 
                 //when using KeyValuePair<TKey, TValue>, TKey must be non-default to stuff in a Dictionary
-                if (type.IsGeneric() && type.GenericTypeDefinition() == typeof(KeyValuePair<,>))
+                if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(KeyValuePair<,>))
                 {
-                    var genericTypes = type.GenericTypeArguments();
+                    var genericTypes = type.GetGenericArguments();
                     var valueType = Activator.CreateInstance(type, CreateDefaultValue(genericTypes[0], recursionInfo), CreateDefaultValue(genericTypes[1], recursionInfo));
                     return PopulateObjectInternal(valueType, recursionInfo);
                 }
 
-                if (type.IsValueType())
+                if (type.IsValueType)
                 {
                     return type.CreateInstance();
                 }
@@ -533,7 +522,7 @@ namespace ServiceStack
                     return PopulateArray(type, recursionInfo);
                 }
 
-                var constructorInfo = type.GetEmptyConstructor();
+                var constructorInfo = type.GetConstructor(Type.EmptyTypes);
                 var hasEmptyConstructor = constructorInfo != null;
 
                 if (hasEmptyConstructor)
@@ -559,7 +548,7 @@ namespace ServiceStack
 
         public static void SetGenericCollection(Type realisedListType, object genericObj, Dictionary<Type, int> recursionInfo)
         {
-            var args = realisedListType.GenericTypeArguments();
+            var args = realisedListType.GetGenericArguments();
             if (args.Length != 1)
             {
                 Tracer.Instance.WriteError("Found a generic list that does not take one generic argument: {0}", realisedListType);
@@ -589,9 +578,9 @@ namespace ServiceStack
         //TODO: replace with InAssignableFrom
         public static bool CanCast(Type toType, Type fromType)
         {
-            if (toType.IsInterface())
+            if (toType.IsInterface)
             {
-                var interfaceList = fromType.Interfaces().ToList();
+                var interfaceList = fromType.GetInterfaces().ToList();
                 if (interfaceList.Contains(toType)) return true;
             }
             else
@@ -602,7 +591,7 @@ namespace ServiceStack
                 {
                     areSameTypes = baseType == toType;
                 }
-                while (!areSameTypes && (baseType = fromType.BaseType()) != null);
+                while (!areSameTypes && (baseType = fromType.BaseType) != null);
 
                 if (areSameTypes) return true;
             }
@@ -626,7 +615,7 @@ namespace ServiceStack
                     }
                 }
             }
-            while ((baseType = baseType.BaseType()) != null);
+            while ((baseType = baseType.BaseType) != null);
         }
     }
 
@@ -808,15 +797,15 @@ namespace ServiceStack
             var underlyingToType = Nullable.GetUnderlyingType(toType) ?? toType;
             var underlyingFromType = Nullable.GetUnderlyingType(fromType) ?? fromType;
 
-            if (underlyingToType.IsEnum())
+            if (underlyingToType.IsEnum)
             {
-                if (underlyingFromType.IsEnum() || fromType == typeof(string))
+                if (underlyingFromType.IsEnum || fromType == typeof(string))
                     return fromValue => Enum.Parse(underlyingToType, fromValue.ToString(), ignoreCase: true);
 
                 if (underlyingFromType.IsIntegerType())
                     return fromValue => Enum.ToObject(underlyingToType, fromValue);
             }
-            else if (underlyingFromType.IsEnum())
+            else if (underlyingFromType.IsEnum)
             {
                 if (underlyingToType.IsIntegerType())
                     return fromValue => Convert.ChangeType(fromValue, underlyingToType, null);
@@ -825,7 +814,7 @@ namespace ServiceStack
             {
                 return null;
             }
-            else if (typeof(IEnumerable).IsAssignableFromType(fromType))
+            else if (typeof(IEnumerable).IsAssignableFrom(fromType))
             {
                 return fromValue =>
                 {
@@ -835,7 +824,7 @@ namespace ServiceStack
                     return listResult ?? fromValue;
                 };
             }
-            else if (toType.IsValueType())
+            else if (toType.IsValueType)
             {
                 return fromValue => Convert.ChangeType(fromValue, toType, provider: null);
             }

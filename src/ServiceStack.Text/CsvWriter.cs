@@ -10,6 +10,8 @@ namespace ServiceStack.Text
     {
         public static void WriteRow(TextWriter writer, IEnumerable<string> row)
         {
+            if (writer == null) return; //AOT
+
             var ranOnce = false;
             foreach (var field in row)
             {
@@ -22,6 +24,8 @@ namespace ServiceStack.Text
 
         public static void WriteObjectRow(TextWriter writer, IEnumerable<object> row)
         {
+            if (writer == null) return; //AOT
+
             var ranOnce = false;
             foreach (var field in row)
             {
@@ -161,7 +165,7 @@ namespace ServiceStack.Text
             var isDataContract = typeof(T).IsDto();
             foreach (var propertyInfo in TypeConfig<T>.Properties)
             {
-                if (!propertyInfo.CanRead || propertyInfo.GetMethodInfo() == null) continue;
+                if (!propertyInfo.CanRead || propertyInfo.GetGetMethod(nonPublic:true) == null) continue;
                 if (!TypeSerializer.CanCreateFromString(propertyInfo.PropertyType)) continue;
 
                 PropertyGetters.Add(propertyInfo.CreateGetter<T>());
@@ -183,8 +187,7 @@ namespace ServiceStack.Text
             for (var i = Headers.Count - 1; i >= 0; i--)
             {
                 var oldHeader = Headers[i];
-                string newHeaderValue;
-                if (!customHeadersMap.TryGetValue(oldHeader, out newHeaderValue))
+                if (!customHeadersMap.TryGetValue(oldHeader, out var newHeaderValue))
                 {
                     Headers.RemoveAt(i);
                     PropertyGetters.RemoveAt(i);
@@ -216,7 +219,7 @@ namespace ServiceStack.Text
 
             if (records == null) return rows;
 
-            if (typeof(T).IsValueType() || typeof(T) == typeof(string))
+            if (typeof(T).IsValueType || typeof(T) == typeof(string))
             {
                 rows.Add(GetSingleRow(records, typeof(T)));
                 return rows;
@@ -242,11 +245,15 @@ namespace ServiceStack.Text
 
         public static void WriteObject(TextWriter writer, object records)
         {
+            if (writer == null) return; //AOT
+
             Write(writer, (IEnumerable<T>)records);
         }
 
         public static void WriteObjectRow(TextWriter writer, object record)
         {
+            if (writer == null) return; //AOT
+
             WriteRow(writer, (T)record);
         }
 
@@ -260,7 +267,7 @@ namespace ServiceStack.Text
                 return;
             }
 
-            if (typeof(T).IsAssignableFromType(typeof(Dictionary<string, object>))) //also does `object`
+            if (typeof(T).IsAssignableFrom(typeof(Dictionary<string, object>))) //also does `object`
             {
                 var dynamicList = records.Select(x => x.ToObjectDictionary()).ToList();
                 CsvDictionaryWriter.Write(writer, dynamicList);
@@ -287,7 +294,7 @@ namespace ServiceStack.Text
 
             if (records == null) return;
 
-            if (typeof(T).IsValueType() || typeof(T) == typeof(string))
+            if (typeof(T).IsValueType || typeof(T) == typeof(string))
             {
                 var singleRow = GetSingleRow(records, typeof(T));
                 WriteRow(writer, singleRow);
@@ -332,6 +339,8 @@ namespace ServiceStack.Text
 
         public static void WriteRow(TextWriter writer, IEnumerable<string> row)
         {
+            if (writer == null) return; //AOT
+
             var ranOnce = false;
             foreach (var field in row)
             {
@@ -344,6 +353,8 @@ namespace ServiceStack.Text
 
         public static void Write(TextWriter writer, IEnumerable<List<string>> rows)
         {
+            if (writer == null) return; //AOT
+
             if (Headers.Count > 0)
             {
                 var ranOnce = false;

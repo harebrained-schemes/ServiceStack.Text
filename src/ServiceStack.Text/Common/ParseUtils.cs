@@ -21,11 +21,7 @@ namespace ServiceStack.Text.Common
 
         public static object NullValueType(Type type)
         {
-#if NETFX_CORE
-            return type.GetTypeInfo().IsValueType ? Activator.CreateInstance(type) : null;
-#else
             return type.GetDefaultValue();
-#endif
         }
 
         public static object ParseObject(string value)
@@ -44,7 +40,7 @@ namespace ServiceStack.Text.Common
                 return x => new Uri(x.FromCsvField());
 
             //Warning: typeof(object).IsInstanceOfType(typeof(Type)) == True??
-            if (type.InstanceOfType(typeof(Type)))
+            if (type.IsInstanceOfType(typeof(Type)))
                 return ParseType;
 
             if (type == typeof(Exception))

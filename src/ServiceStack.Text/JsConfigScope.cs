@@ -53,7 +53,6 @@ namespace ServiceStack.Text
         public bool? TryParseIntoBestFit { get; set; }
         public ParseAsType? ParsePrimitiveFloatingPointTypes { get; set; }
         public ParseAsType? ParsePrimitiveIntegerTypes { get; set; }
-        public bool? UseSystemParseMethods { get; set; }
         public bool? ExcludeDefaultValues { get; set; }
         public bool? IncludeNullValues { get; set; }
         public bool? IncludeNullValuesInDictionaries { get; set; }
@@ -62,6 +61,7 @@ namespace ServiceStack.Text
         public bool? ExcludeTypeInfo { get; set; }
         public bool? IncludeTypeInfo { get; set; }
         public string TypeAttr { get; set; }
+        public string DateTimeFormat { get; set; }
         internal string JsonTypeAttrInObject { get; set; }
         internal string JsvTypeAttrInObject { get; set; }
         public Func<Type, string> TypeWriter { get; set; }

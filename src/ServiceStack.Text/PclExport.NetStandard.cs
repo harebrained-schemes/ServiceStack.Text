@@ -1,7 +1,7 @@
 //Copyright (c) ServiceStack, Inc. All Rights Reserved.
 //License: https://raw.github.com/ServiceStack/ServiceStack/master/license.txt
 
-#if NETSTANDARD1_1
+#if NETSTANDARD2_0
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -15,11 +15,9 @@ using System.Reflection.Emit;
 using System.Runtime.InteropServices;
 using System.Net;
 
-#if NETSTANDARD1_3
 using System.Collections.Specialized;
 using System.Linq.Expressions;
 using Microsoft.Extensions.Primitives;
-#endif
 
 namespace ServiceStack
 {
@@ -58,29 +56,29 @@ namespace ServiceStack
         static readonly Action<HttpWebRequest, string> SetUserAgentDelegate =
             (Action<HttpWebRequest, string>)typeof(HttpWebRequest)
                 .GetProperty("UserAgent")
-                ?.SetMethod()?.CreateDelegate(typeof(Action<HttpWebRequest, string>));
+                ?.GetSetMethod(nonPublic:true)?.CreateDelegate(typeof(Action<HttpWebRequest, string>));
 
         static readonly Action<HttpWebRequest, bool> SetAllowAutoRedirectDelegate =
             (Action<HttpWebRequest, bool>)typeof(HttpWebRequest)
                 .GetProperty("AllowAutoRedirect")
-                ?.SetMethod()?.CreateDelegate(typeof(Action<HttpWebRequest, bool>));
+                ?.GetSetMethod(nonPublic:true)?.CreateDelegate(typeof(Action<HttpWebRequest, bool>));
 
         static readonly Action<HttpWebRequest, bool> SetKeepAliveDelegate =
             (Action<HttpWebRequest, bool>)typeof(HttpWebRequest)
                 .GetProperty("KeepAlive")
-                ?.SetMethod()?.CreateDelegate(typeof(Action<HttpWebRequest, bool>));
+                ?.GetSetMethod(nonPublic:true)?.CreateDelegate(typeof(Action<HttpWebRequest, bool>));
 
         static readonly Action<HttpWebRequest, long> SetContentLengthDelegate =
             (Action<HttpWebRequest, long>)typeof(HttpWebRequest)
                 .GetProperty("ContentLength")
-                ?.SetMethod()?.CreateDelegate(typeof(Action<HttpWebRequest, long>));
+                ?.GetSetMethod(nonPublic:true)?.CreateDelegate(typeof(Action<HttpWebRequest, long>));
 
         private bool allowToChangeRestrictedHeaders;
 
         public NetStandardPclExport()
         {
             this.PlatformName = Platforms.NetStandard;
-#if NETSTANDARD1_3
+#if NETSTANDARD2_0
             this.DirSep = Path.DirectorySeparatorChar;
 #else 
             this.DirSep = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? '\\' : '/';
@@ -99,7 +97,7 @@ namespace ServiceStack
         public override string ReadAllText(string filePath)
         {
             //NET Standard 1.1 does not supported Stream Reader with string constructor
-#if NETSTANDARD1_3
+#if NETSTANDARD2_0
             using (StreamReader rdr = File.OpenText(filePath))
             {
                 return rdr.ReadToEnd();
@@ -109,7 +107,7 @@ namespace ServiceStack
 #endif
         }
 
-#if NETSTANDARD1_3
+#if NETSTANDARD2_0
         public override bool FileExists(string filePath)
         {
             return File.Exists(filePath);
@@ -174,26 +172,7 @@ namespace ServiceStack
                 return Path.GetFullPath(relativePath.Replace("~", hostDirectoryPath));
             }
             return relativePath;
-        }
-        
-#elif NETSTANDARD1_1
-        public string BinPath = null;
-
-        public override string MapAbsolutePath(string relativePath, string appendPartialPathModifier)
-        {
-            if (BinPath == null)
-            {
-                var codeBase = GetAssemblyCodeBase(typeof(PclExport).GetTypeInfo().Assembly);
-                if (codeBase == null)
-                    throw new Exception("NetStandardPclExport.BinPath must be initialized");
-
-                BinPath = Path.GetDirectoryName(codeBase.Replace("file:///", ""));
-            }
-
-            return relativePath.StartsWith("~")
-                ? relativePath.Replace("~", BinPath)
-                : relativePath;
-        }
+        }        
 #endif
         public static PclExport Configure()
         {
@@ -203,7 +182,7 @@ namespace ServiceStack
 
         public override string GetEnvironmentVariable(string name)
         {
-#if NETSTANDARD1_3
+#if NETSTANDARD2_0
             return Environment.GetEnvironmentVariable(name);
 #else
             return null;
@@ -212,7 +191,7 @@ namespace ServiceStack
 
         public override void WriteLine(string line)
         {
-#if NETSTANDARD1_3
+#if NETSTANDARD2_0
             Console.WriteLine(line);
 #else
             System.Diagnostics.Debug.WriteLine(line);
@@ -221,14 +200,14 @@ namespace ServiceStack
 
         public override void WriteLine(string format, params object[] args)
         {
-#if NETSTANDARD1_3
+#if NETSTANDARD2_0
             Console.WriteLine(format, args);
 #else
             System.Diagnostics.Debug.WriteLine(format, args);
 #endif
         }
 
-#if NETSTANDARD1_3
+#if NETSTANDARD2_0
         public override void AddCompression(WebRequest webReq)
         {
             var httpReq = (HttpWebRequest)webReq;
@@ -250,13 +229,13 @@ namespace ServiceStack
 
         public override string GetAssemblyCodeBase(Assembly assembly)
         {
-            var dll = typeof(PclExport).GetAssembly();
+            var dll = typeof(PclExport).Assembly;
             var pi = dll.GetType().GetProperty("CodeBase");
             var codeBase = pi?.GetProperty(dll).ToString();
             return codeBase;
         }
 
-#if NETSTANDARD1_3
+#if NETSTANDARD2_0
         public override string GetAssemblyPath(Type source)
         {
             var codeBase = GetAssemblyCodeBase(source.GetTypeInfo().Assembly);
@@ -280,20 +259,20 @@ namespace ServiceStack
 
         public override bool InSameAssembly(Type t1, Type t2)
         {
-            return t1.GetAssembly() == t2.GetAssembly();
+            return t1.Assembly == t2.Assembly;
         }
 
         public override Type GetGenericCollectionType(Type type)
         {
             return type.GetTypeInfo().ImplementedInterfaces.FirstOrDefault(t =>
-                t.IsGenericType()
+                t.IsGenericType
                 && t.GetGenericTypeDefinition() == typeof(ICollection<>));
         }
 
         public override GetMemberDelegate CreateGetter(PropertyInfo propertyInfo)
         {
             return
-#if NETSTANDARD1_3
+#if NETSTANDARD2_0
                 SupportsEmit ? PropertyInvoker.GetEmit(propertyInfo) :
 #endif
                 SupportsExpression
@@ -304,7 +283,7 @@ namespace ServiceStack
         public override GetMemberDelegate<T> CreateGetter<T>(PropertyInfo propertyInfo)
         {
             return
-#if NETSTANDARD1_3
+#if NETSTANDARD2_0
                 SupportsEmit ? PropertyInvoker.GetEmit<T>(propertyInfo) :
 #endif
                 SupportsExpression
@@ -315,7 +294,7 @@ namespace ServiceStack
         public override SetMemberDelegate CreateSetter(PropertyInfo propertyInfo)
         {
             return
-#if NETSTANDARD1_3
+#if NETSTANDARD2_0
                 SupportsEmit ? PropertyInvoker.SetEmit(propertyInfo) :
 #endif
                 SupportsExpression
@@ -333,7 +312,7 @@ namespace ServiceStack
         public override GetMemberDelegate CreateGetter(FieldInfo fieldInfo)
         {
             return
-#if NETSTANDARD1_3
+#if NETSTANDARD2_0
                 SupportsEmit ? FieldInvoker.GetEmit(fieldInfo) :
 #endif
                 SupportsExpression
@@ -344,7 +323,7 @@ namespace ServiceStack
         public override GetMemberDelegate<T> CreateGetter<T>(FieldInfo fieldInfo)
         {
             return
-#if NETSTANDARD1_3
+#if NETSTANDARD2_0
                 SupportsEmit ? FieldInvoker.GetEmit<T>(fieldInfo) :
 #endif
                 SupportsExpression
@@ -355,7 +334,7 @@ namespace ServiceStack
         public override SetMemberDelegate CreateSetter(FieldInfo fieldInfo)
         {
             return
-#if NETSTANDARD1_3
+#if NETSTANDARD2_0
                 SupportsEmit ? FieldInvoker.SetEmit(fieldInfo) :
 #endif
                 SupportsExpression
@@ -368,11 +347,6 @@ namespace ServiceStack
             return SupportsExpression
                 ? FieldInvoker.SetExpression<T>(fieldInfo)
                 : base.CreateSetter<T>(fieldInfo);
-        }
-
-        public override string ToXsdDateTimeString(DateTime dateTime)
-        {
-            return System.Xml.XmlConvert.ToString(dateTime.ToStableUniversalTime());
         }
 
         public override DateTime ParseXsdDateTimeAsUtc(string dateTimeStr)
@@ -388,7 +362,7 @@ namespace ServiceStack
         //    return TimeZoneInfo.ConvertTimeToUtc(dateTime);
         //}
 
-#if NETSTANDARD1_3
+#if NETSTANDARD2_0
         public override ParseStringDelegate GetSpecializedCollectionParseMethod<TSerializer>(Type type)
         {
             if (type == typeof(StringCollection))
@@ -426,7 +400,7 @@ namespace ServiceStack
 #endif
         public override ParseStringDelegate GetJsReaderParseMethod<TSerializer>(Type type)
         {
-            if (type.AssignableFrom(typeof(System.Dynamic.IDynamicMetaObjectProvider)) ||
+            if (type.IsAssignableFrom(typeof(System.Dynamic.IDynamicMetaObjectProvider)) ||
                 type.HasInterface(typeof(System.Dynamic.IDynamicMetaObjectProvider)))
             {
                 return DeserializeDynamic<TSerializer>.Parse;
@@ -437,7 +411,7 @@ namespace ServiceStack
 
         public override ParseStringSegmentDelegate GetJsReaderParseStringSegmentMethod<TSerializer>(Type type)
         {
-            if (type.AssignableFrom(typeof(System.Dynamic.IDynamicMetaObjectProvider)) ||
+            if (type.IsAssignableFrom(typeof(System.Dynamic.IDynamicMetaObjectProvider)) ||
                 type.HasInterface(typeof(System.Dynamic.IDynamicMetaObjectProvider)))
             {
                 return DeserializeDynamic<TSerializer>.ParseStringSegment;
@@ -508,7 +482,7 @@ namespace ServiceStack
             //if (preAuthenticate.HasValue) req.PreAuthenticate = preAuthenticate.Value;
         }
         
-#if NETSTANDARD1_3
+#if NETSTANDARD2_0
         public override string GetStackTrace()
         {
             return Environment.StackTrace;
@@ -517,7 +491,7 @@ namespace ServiceStack
 
         public override Type UseType(Type type)
         {
-            if (type.IsInterface() || type.IsAbstract())
+            if (type.IsInterface || type.IsAbstract)
             {
                 return DynamicProxy.GetInstanceFor(type).GetType();
             }

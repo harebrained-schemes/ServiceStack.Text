@@ -16,7 +16,7 @@ using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using ServiceStack.Text.Support;
-#if NETSTANDARD1_1
+#if NETSTANDARD2_0
 using Microsoft.Extensions.Primitives;
 #endif
 
@@ -74,9 +74,14 @@ namespace ServiceStack.Text.Common
                 }
             }
 
-            return (JsConfig.TryToParsePrimitiveTypeValues
-                ? ParsePrimitive(strType.Value)
-                : null) ?? Serializer.UnescapeString(strType).Value;
+            var primitiveType = JsConfig.TryToParsePrimitiveTypeValues ? ParsePrimitive(strType.Value) : null;
+            if (primitiveType != null)
+                return primitiveType;
+
+            if (Serializer.ObjectDeserializer != null)
+                return Serializer.ObjectDeserializer(strType);
+
+            return Serializer.UnescapeString(strType).Value;
         }
 
         public static Type ExtractType(string strType) => ExtractType(new StringSegment(strType));
@@ -120,7 +125,7 @@ namespace ServiceStack.Text.Common
 
         public static object ParseAbstractType<T>(StringSegment value)
         {
-            if (typeof(T).IsAbstract())
+            if (typeof(T).IsAbstract)
             {
                 if (value.IsNullOrEmpty()) return null;
                 var concreteType = ExtractType(value);
@@ -285,7 +290,7 @@ namespace ServiceStack.Text.Common
         private static SetMemberDelegate GetSetPropertyMethod(TypeConfig typeConfig, PropertyInfo propertyInfo)
         {
             if (typeConfig.Type != propertyInfo.DeclaringType)
-                propertyInfo = propertyInfo.DeclaringType.GetPropertyInfo(propertyInfo.Name);
+                propertyInfo = propertyInfo.DeclaringType.GetProperty(propertyInfo.Name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
 
             if (!propertyInfo.CanWrite && !typeConfig.EnableAnonymousFieldSetters) return null;
 
@@ -326,7 +331,7 @@ namespace ServiceStack.Text.Common
         private static SetMemberDelegate GetSetFieldMethod(TypeConfig typeConfig, FieldInfo fieldInfo)
         {
             if (typeConfig.Type != fieldInfo.DeclaringType)
-                fieldInfo = fieldInfo.DeclaringType.GetFieldInfo(fieldInfo.Name);
+                fieldInfo = fieldInfo.DeclaringType.GetField(fieldInfo.Name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
 
             return PclExport.Instance.CreateSetter(fieldInfo);
         }

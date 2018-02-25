@@ -748,7 +748,7 @@ namespace ServiceStack
 
         public static string ToTitleCase(this string value)
         {
-            return PclExport.Instance.ToTitleCase(value);
+            return CultureInfo.InvariantCulture.TextInfo.ToTitleCase(value).Replace("_", String.Empty);
         }
 
         public static string ToLowercaseUnderscore(this string value)
@@ -961,13 +961,13 @@ namespace ServiceStack
 
         public static bool IsUserType(this Type type)
         {
-            return type.IsClass()
+            return type.IsClass
                 && !type.IsSystemType();
         }
 
         public static bool IsUserEnum(this Type type)
         {
-            return type.IsEnum()
+            return type.IsEnum
                 && !type.IsSystemType();
         }
 

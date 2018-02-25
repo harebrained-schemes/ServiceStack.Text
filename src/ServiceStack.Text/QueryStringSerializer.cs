@@ -17,6 +17,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using ServiceStack.Text;
@@ -91,6 +92,12 @@ namespace ServiceStack
             GetWriteFn(value.GetType())(writer, value);
             return StringWriterThreadStatic.ReturnAndFree(writer);
         }
+
+        [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.NoOptimization)]
+        public static void InitAot<T>()
+        {
+            QueryStringWriter<T>.WriteFn();
+        }
     }
 
     /// <summary>
@@ -112,17 +119,17 @@ namespace ServiceStack
             {
                 CacheFn = QueryStringSerializer.WriteLateBoundObject;
             }
-            else if (typeof(T).AssignableFrom(typeof(IDictionary))
+            else if (typeof(T).IsAssignableFrom(typeof(IDictionary))
                 || typeof(T).HasInterface(typeof(IDictionary)))
             {
                 CacheFn = WriteIDictionary;
             }
             else
             {
-                var isEnumerable = typeof(T).AssignableFrom(typeof(IEnumerable))
+                var isEnumerable = typeof(T).IsAssignableFrom(typeof(IEnumerable))
                     || typeof(T).HasInterface(typeof(IEnumerable));
 
-                if ((typeof(T).IsClass() || typeof(T).IsInterface())
+                if ((typeof(T).IsClass || typeof(T).IsInterface)
                     && !isEnumerable)
                 {
                     var canWriteType = WriteType<T, JsvTypeSerializer>.Write;
@@ -212,7 +219,6 @@ namespace ServiceStack
     internal class PropertyTypeConfig
     {
         public TypeConfig TypeConfig;
-        public string[] PropertyNames;
         public Action<string, TextWriter, object> WriteFn;
     }
 
@@ -237,8 +243,7 @@ namespace ServiceStack
 
         public static bool FormUrlEncoded(TextWriter writer, string propertyName, object obj)
         {
-            var map = obj as IDictionary;
-            if (map != null)
+            if (obj is IDictionary map)
             {
                 var i = 0;
                 foreach (var key in map.Keys)

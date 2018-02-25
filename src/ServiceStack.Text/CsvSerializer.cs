@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using ServiceStack.Text.Common;
@@ -21,8 +22,7 @@ namespace ServiceStack.Text
         {
             try
             {
-                WriteObjectDelegate writeFn;
-                if (WriteFnCache.TryGetValue(type, out writeFn)) return writeFn;
+                if (WriteFnCache.TryGetValue(type, out var writeFn)) return writeFn;
 
                 var genericType = typeof(CsvSerializer<>).MakeGenericType(type);
                 var mi = genericType.GetStaticMethod("WriteFn");
@@ -55,8 +55,7 @@ namespace ServiceStack.Text
         {
             try
             {
-                ParseStringDelegate writeFn;
-                if (ReadFnCache.TryGetValue(type, out writeFn)) return writeFn;
+                if (ReadFnCache.TryGetValue(type, out var writeFn)) return writeFn;
 
                 var genericType = typeof(CsvSerializer<>).MakeGenericType(type);
                 var mi = genericType.GetStaticMethod("ReadFn");
@@ -184,16 +183,16 @@ namespace ServiceStack.Text
 
         internal static T ConvertFrom<T>(object results)
         {
-            if (typeof(T).IsAssignableFromType(results.GetType()))
-                return (T)results;
+            if (results is T variable)
+                return variable;
 
-            foreach (var ci in typeof(T).GetAllConstructors())
+            foreach (var ci in typeof(T).GetConstructors())
             {
                 var ciParams = ci.GetParameters();
                 if (ciParams.Length == 1)
                 {
                     var pi = ciParams.First();
-                    if (pi.ParameterType.IsAssignableFromType(typeof(T)))
+                    if (pi.ParameterType.IsAssignableFrom(typeof(T)))
                     {
                         var to = ci.Invoke(new[] { results });
                         return (T)to;
@@ -206,16 +205,16 @@ namespace ServiceStack.Text
 
         internal static object ConvertFrom(Type type, object results)
         {
-            if (type.IsAssignableFromType(results.GetType()))
+            if (type.IsInstanceOfType(results))
                 return results;
 
-            foreach (var ci in type.GetAllConstructors())
+            foreach (var ci in type.GetConstructors())
             {
                 var ciParams = ci.GetParameters();
                 if (ciParams.Length == 1)
                 {
                     var pi = ciParams.First();
-                    if (pi.ParameterType.IsAssignableFromType(type))
+                    if (pi.ParameterType.IsAssignableFrom(type))
                     {
                         var to = ci.Invoke(new[] { results });
                         return to;
@@ -224,6 +223,22 @@ namespace ServiceStack.Text
             }
 
             return results.ConvertTo(type);
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.NoOptimization)]
+        public static void InitAot<T>()
+        {
+            CsvSerializer<T>.WriteFn();
+            CsvSerializer<T>.WriteObject(null, null);
+            CsvWriter<T>.Write(null, default(IEnumerable<T>));
+            CsvWriter<T>.WriteRow(null, default(T));
+            CsvWriter<T>.WriteObject(null, default(IEnumerable<T>));
+            CsvWriter<T>.WriteObjectRow(null, default(IEnumerable<T>));
+
+            CsvReader<T>.ReadRow(null);
+            CsvReader<T>.ReadObject(null);
+            CsvReader<T>.ReadObjectRow(null);
+            CsvReader<T>.ReadStringDictionary(null);
         }
     }
 
@@ -248,7 +263,7 @@ namespace ServiceStack.Text
             Type bestCandidateEnumerableType = null;
             PropertyInfo bestCandidate = null;
 
-            if (typeof(T).IsValueType())
+            if (typeof(T).IsValueType)
             {
                 return JsvWriter<T>.WriteObject;
             }
@@ -264,7 +279,7 @@ namespace ServiceStack.Text
                     return WriteSelf;
                 }
 
-                var elementType = bestCandidateEnumerableType.GenericTypeArguments()[0];
+                var elementType = bestCandidateEnumerableType.GetGenericArguments()[0];
                 writeElementFn = CreateWriteFn(elementType);
 
                 return WriteEnumerableType;
@@ -279,7 +294,7 @@ namespace ServiceStack.Text
                     if (propertyInfo.Name == IgnoreResponseStatus) continue;
 
                     if (propertyInfo.PropertyType == typeof(string)
-                        || propertyInfo.PropertyType.IsValueType()
+                        || propertyInfo.PropertyType.IsValueType
                         || propertyInfo.PropertyType == typeof(byte[]))
                         continue;
 
@@ -311,7 +326,7 @@ namespace ServiceStack.Text
             if (bestCandidateEnumerableType != null)
             {
                 valueGetter = bestCandidate.CreateGetter();
-                var elementType = bestCandidateEnumerableType.GenericTypeArguments()[0];
+                var elementType = bestCandidateEnumerableType.GetGenericArguments()[0];
                 writeElementFn = CreateWriteFn(elementType);
 
                 return WriteEnumerableProperty;
@@ -410,7 +425,7 @@ namespace ServiceStack.Text
             Type bestCandidateEnumerableType = null;
             PropertyInfo bestCandidate = null;
 
-            if (typeof(T).IsValueType())
+            if (typeof(T).IsValueType)
             {
                 return JsvReader<T>.Parse;
             }
@@ -419,7 +434,7 @@ namespace ServiceStack.Text
             bestCandidateEnumerableType = typeof(T).GetTypeWithGenericTypeDefinitionOf(typeof(IEnumerable<>));
             if (bestCandidateEnumerableType != null)
             {
-                var elementType = bestCandidateEnumerableType.GenericTypeArguments()[0];
+                var elementType = bestCandidateEnumerableType.GetGenericArguments()[0];
                 readElementFn = CreateReadFn(elementType);
 
                 return ReadEnumerableType;
@@ -434,7 +449,7 @@ namespace ServiceStack.Text
                     if (propertyInfo.Name == IgnoreResponseStatus) continue;
 
                     if (propertyInfo.PropertyType == typeof(string)
-                        || propertyInfo.PropertyType.IsValueType()
+                        || propertyInfo.PropertyType.IsValueType
                         || propertyInfo.PropertyType == typeof(byte[]))
                         continue;
 
@@ -466,7 +481,7 @@ namespace ServiceStack.Text
             if (bestCandidateEnumerableType != null)
             {
                 valueSetter = bestCandidate.CreateSetter();
-                var elementType = bestCandidateEnumerableType.GenericTypeArguments()[0];
+                var elementType = bestCandidateEnumerableType.GetGenericArguments()[0];
                 readElementFn = CreateReadFn(elementType);
 
                 return ReadEnumerableProperty;
@@ -519,6 +534,8 @@ namespace ServiceStack.Text
 
         public static object ReadNonEnumerableType(string row)
         {
+            if (row == null) return null; //AOT
+
             var value = readElementFn(row);
             var to = typeof(T).CreateInstance();
             valueSetter(to, value);
@@ -527,6 +544,8 @@ namespace ServiceStack.Text
 
         public static object ReadObject(string value)
         {
+            if (value == null) return null; //AOT
+
             var hold = JsState.IsCsv;
             JsState.IsCsv = true;
             try
@@ -538,7 +557,5 @@ namespace ServiceStack.Text
                 JsState.IsCsv = hold;
             }
         }
-
-
     }
 }

@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 using ServiceStack.Text.Json;
-#if NETSTANDARD1_1
+#if NETSTANDARD2_0
 using Microsoft.Extensions.Primitives;
 #else
 using ServiceStack.Text.Support;
@@ -12,6 +12,8 @@ namespace ServiceStack.Text.Common
 {
     public interface ITypeSerializer
     {
+        Func<StringSegment, object> ObjectDeserializer { get; set; }
+
         bool IncludeNullValues { get; }
         bool IncludeNullValuesInDictionaries { get; }
         string TypeAttrInObject { get; }
